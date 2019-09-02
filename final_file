@@ -1,0 +1,331 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Aug 30 14:21:55 2019
+
+@author: anandabhishek
+"""
+
+import os
+os.chdir("/Users/anandabhishek/Documents/train_NA17Sgz")
+
+import pandas as pd
+import numpy as np
+
+train=pd.read_csv("train.csv")
+view_log=pd.read_csv("view_log.csv")
+item_data=pd.read_csv("item_data.csv")
+test=pd.read_csv("test.csv")
+
+train_m=train.merge(view_log,on="user_id",how="left")
+test_m=test.merge(view_log,on="user_id",how="left")
+
+train_m.columns
+
+train_m['impression_time']=pd.to_datetime(train_m['impression_time'])
+train_m['server_time']=pd.to_datetime(train_m['server_time'])
+test_m['impression_time']=pd.to_datetime(test_m['impression_time'])
+test_m['server_time']=pd.to_datetime(test_m['server_time'])
+
+train_m['diff']=train_m['impression_time']-train_m['server_time']
+test_m['diff']=test_m['impression_time']-test_m['server_time']
+
+train_m1=train_m[(train_m['impression_time'] > train_m['server_time'])]
+test_m1=test_m[(test_m['impression_time'] > test_m['server_time'])]
+train_m1['diff']=train_m1['diff'].dt.total_seconds()
+train_m1['diff']=(train_m1['diff']/(24*3600)).round()
+train_m1['diff'].head()
+
+test_m1['diff']=test_m1['diff'].dt.total_seconds()
+test_m1['diff']=(test_m1['diff']/(24*3600)).round()
+test_m1['diff'].max()
+
+
+
+train_final=train_m1.merge(item_data,on='item_id',how='left')
+test_final=test_m1.merge(item_data,on='item_id',how='left')
+
+label=train['is_click'].values.reshape(237609,)
+train_final['ind']=1
+test_final['ind']=2
+train_final=train_final.drop('is_click',axis=1)
+import pandas as pd
+total=pd.concat([train_final,test_final],axis=0).fillna(0)
+
+cross_cat_1.head()
+
+#### repeat for variables which are too sparse ###
+
+cross_cat_1=pd.crosstab(total['impression_id'],total['category_3'],dropna=False).reset_index()
+train_imp=train_final[['impression_id']]
+test_imp=test_final[['impression_id']]
+Y1=train_imp.merge(cross_cat_1,on=['impression_id'],how='left').drop(['impression_id'], axis=1)
+Y2=test_imp.merge(cross_cat_1,on=['impression_id'],how='left').drop(['impression_id'], axis=1)
+cross_cat_3=Y1.fillna(0).values
+cross_cat_t_3=Y2.fillna(0).values
+
+
+from keras.models import Model
+from keras.layers import Input, Dense
+from keras import regularizers
+input_dim=Input(shape=(79,))
+encoded=Dense(40,activation='relu',)(input_dim)
+encoded2=Dense(20,activation='relu')(encoded)
+encoded3=Dense(40,activation='relu')(encoded2)
+encoded4=Dense(79,activation='relu')(encoded3)
+autoencoder=Model(input=input_dim,output=decoded)
+autoencoder.compile(optimizer='adam',loss='binary_crossentropy')
+autoencoder.fit(cross_cat_3,cross_cat_3,nb_epoch=10,batch_size=1000)
+encoder=Model(input=input_dim,output=encoded2)
+
+encoded_dtype=encoder.predict(cross_cat_3)
+encoded_dtype_t=encoder.predict(cross_cat_t_3)
+encoded_dtype=cross_cat_3
+encoded_dtype_t=cross_cat_t_3
+#####################################################
+Fetch If Person clicked previously
+#####################################################
+
+train_click_summ=train[['user_id','is_click']]
+train_click_summ2=train_click_summ.groupby('user_id').max().reset_index()
+train_imp1=train[['impression_time','user_id']]
+train2=train_imp1.merge(train_click_summ2,on='user_id')
+train2.rename(columns={'is_click':'prev_click'}, inplace=True)
+train2.rename(columns={'impression_time':'impression_time2'}, inplace=True)
+train2.head()
+train_2=train.merge(train2,on='user_id',how='left')
+train_2 = train_2[(train_2.impression_time > train_2.impression_time2)]
+train_3=train_2.groupby('impression_id')['prev_click'].max().reset_index()
+train_3=train_imp.merge(train_3,on='impression_id',how='left').fillna(0)
+len(train_3)
+
+test_2=test.merge(train2,on='user_id',how='left')
+test_2 = test_2[(test_2.impression_time > test_2.impression_time2)]
+test_3=test_2.groupby('impression_id')['prev_click'].max().reset_index()
+test_3=test_imp.merge(test_3,on='impression_id',how='left').fillna(0)
+len(test_3)
+
+train_prev=np.array(train_3['prev_click'].values)
+test_prev=np.array(test_3['prev_click'].values)
+##########################################################
+Encode previous clicks
+##########################################################
+X1=train_prev
+X2=test_prev
+from keras.utils import np_utils
+from sklearn.preprocessing import LabelEncoder
+encoder=LabelEncoder()
+encoder.fit(X1)
+encoded_X1=encoder.transform(X1)
+train_pre=np_utils.to_categorical(encoded_X1)[:,1]
+
+encoder=LabelEncoder()
+encoder.fit(X2)
+encoded_X2=encoder.transform(X2)
+test_pre=np_utils.to_categorical(encoded_X2)[:,1]
+
+X1=train_im
+X2=test_im
+from keras.utils import np_utils
+from sklearn.preprocessing import LabelEncoder
+encoder=LabelEncoder()
+encoder.fit(X1)
+encoded_X1=encoder.transform(X1)
+train_cm=np_utils.to_categorical(encoded_X1)[:,1]
+
+encoder=LabelEncoder()
+encoder.fit(X2)
+encoded_X2=encoder.transform(X2)
+test_cm=np_utils.to_categorical(encoded_X2)[:,1]
+
+X1=train['os_version']
+X2=test['os_version']
+from keras.utils import np_utils
+from sklearn.preprocessing import LabelEncoder
+encoder=LabelEncoder()
+encoder.fit(X1)
+encoded_X1=encoder.transform(X1)
+train_os=np_utils.to_categorical(encoded_X1)[:,1]
+
+encoder=LabelEncoder()
+encoder.fit(X2)
+encoded_X2=encoder.transform(X2)
+test_os=np_utils.to_categorical(encoded_X2)[:,1]
+
+train['impression_time']=pd.to_datetime(train['impression_time'])
+test['impression_time']=pd.to_datetime(test['impression_time'])
+
+train['dow']=train['impression_time'].dt.dayofweek
+test['dow']=test['impression_time'].dt.dayofweek
+train['hr']=train['impression_time'].dt.hour
+test['hr']=test['impression_time'].dt.hour
+train['dy']=train['impression_time'].dt.day
+test['dy']=test['impression_time'].dt.day
+
+####count all visits before impression ###
+train_imp=train_final[['impression_id']]
+train_imp['ind']=1
+train_imp=train_imp.groupby('impression_id').sum().reset_index()
+train_imp2=train[['impression_id']]
+train_cnt=train_imp2.merge(train_imp,on='impression_id',how='left').fillna(0)
+
+test_imp=test_final[['impression_id']]
+test_imp['ind']=1
+test_imp=test_imp.groupby('impression_id').sum().reset_index()
+test_imp2=test[['impression_id']]
+test_cnt=test_imp2.merge(test_imp,on='impression_id',how='left').fillna(0)
+### Merge Data till now #####
+
+train_dow=train['dow'].values
+test_dow=test['dow'].values
+train_hr=train['hr'].values
+test_hr=test['hr'].values
+train_dy=train['dy'].values
+test_dy=test['dy'].values
+time_data_tr=np.transpose(np.concatenate([train_dow,train_hr,train_dy]).reshape(3,237609))
+time_data_te=np.transpose(np.concatenate([test_dow,test_hr,test_dy]).reshape(3,90675))
+
+
+train_cnt=train_cnt['ind'].values
+test_cnt=test_cnt['ind'].values
+train_merge1=np.transpose(np.append(train_cnt,train_pre).reshape(2,237609))
+test_merge1=np.transpose(np.append(test_cnt,test_pre).reshape(2,90675))
+
+train_other=np.transpose(np.append(train_4g,train_os).reshape(2,237609))
+test_other=np.transpose(np.append(test_4g,test_os).reshape(2,90675))
+
+train_feature1=np.concatenate([encoded_app,encoded_cat_3,encoded_cat_2,train_merge1,time_data_tr,train_other],axis=1)
+test_feature1=np.concatenate([encoded_app_t,encoded_cat_t_3,encoded_cat_t_2,test_merge1,time_data_te,test_other],axis=1)
+
+train_feature2=np.transpose(np.append(train_cm,train_cm).reshape(2,237609))
+test_feature2=np.transpose(np.append(test_cm,test_cm).reshape(2,90675))
+
+train_feature=np.append(train_feature1,train_feature2,axis=1)[:,0:88]
+test_feature=np.append(test_feature1,test_feature2,axis=1)[:,0:88]
+
+train_feat3=np.append(encoded_dtype,train_feature,axis=1)[:,0:90]
+test_feat3=np.append(encoded_dtype_t,test_feature,axis=1)[:,0:90]
+
+train_feat4=np.append(train_feat3,dur,axis=1)
+
+########## First Model ###################
+from keras.models import Sequential
+from keras.layers import Dense
+model = Sequential()
+model.add(Dense(92,input_dim=2,activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(92, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+print(model.summary())
+
+model.fit(dur, label, epochs=20, batch_size=5000)
+###########################################
+GBM
+###########################################
+from sklearn.ensemble import GradientBoostingClassifier
+gb=GradientBoostingClassifier(learning_rate=0.001,n_estimators=20,max_depth=5,loss='hinge')
+gb.fit(X_train,y_train)
+test_pred_gb=gb.predict_proba(X_test)[:,1]
+#########################################
+from sklearn.ensemble import RandomForestClassifier
+clf = RandomForestClassifier(n_estimators=20, max_depth=4,random_state=0)
+clf.fit(X_train,y_train)
+
+import lightgbm
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(train_feat4, label, test_size=0.30, random_state=42)
+
+test_pred_dl=model.predict(X_test)
+
+
+from sklearn.metrics import roc_auc_score
+roc_auc_score(y_test,test_pred_dl)
+
+
+X_train=np.nan_to_num(X_train)
+
+test_pred_dl=model.predict(test_feat3)
+test['is_click']=test_pred_dl
+test.to_csv('test_012.csv',index=False)
+test['is_click'].mean()
+
+train['is_click'].mean()
+pd.crosstab()
+
+import pandas as pd
+train_feature1=pd.DataFrame(train_feature1)
+test_feature1=pd.DataFrame(test_feature1)
+
+test_feature1.to_csv('test_feature1.csv',index=False)
+
+############## try sequence ###################
+train=train.sort_values(by=['user_id','impression_time'])
+test=test.sort_values(by=['user_id','impression_time'])
+tt1=train[['user_id','impression_time']]
+tt2=test[['user_id','impression_time']]
+total=pd.concat([tt1,tt2],axis=0)
+
+total_cum=total[['user_id']]
+total_cum['ind']=1
+df1 = total_cum.groupby(['user_id']).cumsum().reset_index()
+total['cum_cnt']=df1.ind
+train.head(20)
+
+train_cum_cnt=total['cum_cnt'][0:237609,]
+test_cum_cnt=total['cum_cnt'][237609:,]
+
+train['cum_cnt']=train_cum_cnt
+test['cum_cnt']=test_cum_cnt
+
+train_ct=train[['impression_id','cum_cnt']]
+test_ct=test[['impression_id','cum_cnt']]
+
+
+train_im=train_imp.merge(train_ct,on='impression_id',how='left').fillna(0)
+test_im=test_imp.merge(test_ct,on='impression_id',how='left').fillna(0)
+
+test_im=test_im['cum_cnt']
+train_im=train_im['cum_cnt']
+
+
+###### session id ####
+
+train_m1['hours']=pd.to_datetime(train_m1['server_time']).dt.hour
+train_m1['min']=pd.to_datetime(train_m1['server_time']).dt.minute
+train_m1['min'].head()
+
+sess_data=train_m1[['user_id','session_id']].drop_duplicates()
+
+sess_data1=sess_data.groupby(['user_id','session_id']).min().reset_index()
+sess_data2=sess_data.groupby(['user_id','session_id']).max().reset_index()
+
+sess_data['dur']=(sess_data2['server_time']-sess_data1['server_time']).dt.total_seconds()
+
+
+train_m_dur=train_m1.merge(sess_data,on=['user_id','session_id'],how='left').fillna(0)
+
+df=train_m_dur[['impression_id','server_time','dur']]
+df2=df.sort_values(['impression_id','server_time'],ascending=False)
+df3=df2.drop_duplicates(subset=['impression_id'],keep='first')
+
+train_m_dur1=train_m_dur.groupby('impression_id').mean().reset_index()
+
+train_m_dur1['last_dur']=df3['dur']
+
+train_m_dur1=train_m_dur1.fillna(0)
+
+train_m_dur2=train_imp.merge(train_m_dur1,on='impression_id',how='left').fillna(0)
+
+train_m_dur2.head(20)
+
+dur1=train_m_dur2['dur'].values
+dur2=train_m_dur2['last_dur'].values
+len(dur2)
+dur=np.transpose(np.append(dur1,dur2).reshape(2,237609))
